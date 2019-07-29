@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -117,15 +118,28 @@ func addDebug(server *Server) *MessageBroadcast {
 				}
 			}
 
-			switch {
-			case msg.Buttons&computrainer.ButtonPlus > 0:
-				fmt.Printf("Plus\n")
-			case msg.Buttons&computrainer.ButtonMinus > 0:
-				fmt.Printf("Minus\n")
-			case msg.Buttons&computrainer.ButtonReset > 0:
-				fmt.Printf("reset\n")
-			case msg.Buttons&computrainer.ButtonF1 > 0:
-				fmt.Printf("f1\n")
+			if msg.Buttons != computrainer.ButtonNone {
+				var pressed []string
+
+				if msg.Buttons&computrainer.ButtonPlus > 0 {
+					pressed = append(pressed, "Plus")
+				}
+				if msg.Buttons&computrainer.ButtonMinus > 0 {
+					pressed = append(pressed, "Minus")
+				}
+				if msg.Buttons&computrainer.ButtonReset > 0 {
+					pressed = append(pressed, "Reset")
+				}
+				if msg.Buttons&computrainer.ButtonF1 > 0 {
+					pressed = append(pressed, "F1")
+				}
+				if msg.Buttons&computrainer.ButtonF2 > 0 {
+					pressed = append(pressed, "F2")
+				}
+				if msg.Buttons&computrainer.ButtonF3 > 0 {
+					pressed = append(pressed, "F3")
+				}
+				fmt.Println(strings.Join(pressed, "|"))
 			}
 		}
 	}()
@@ -277,42 +291,33 @@ func (s *Server) GetData(req *computrainer.DataRequest, dataServer computrainer.
 				}
 			}
 
-			switch {
-			case msg.Buttons&computrainer.ButtonPlus > 0:
-				err := dataServer.Send(&computrainer.ControllerData{
-					ControlData: &computrainer.ControlData{
-						Pressed: []computrainer.ControlData_Button{computrainer.ControlData_PLUS},
-					},
-				})
-				if err != nil {
-					return fmt.Errorf("error sending button: %v", err)
+			if msg.Buttons != computrainer.ButtonNone {
+				var controlData computrainer.ControlData
+
+				if msg.Buttons&computrainer.ButtonPlus > 0 {
+					controlData.Pressed = append(controlData.Pressed, computrainer.ControlData_PLUS)
 				}
-			case msg.Buttons&computrainer.ButtonMinus > 0:
-				err := dataServer.Send(&computrainer.ControllerData{
-					ControlData: &computrainer.ControlData{
-						Pressed: []computrainer.ControlData_Button{computrainer.ControlData_MINUS},
-					},
-				})
-				if err != nil {
-					return fmt.Errorf("error sending button: %v", err)
+				if msg.Buttons&computrainer.ButtonMinus > 0 {
+					controlData.Pressed = append(controlData.Pressed, computrainer.ControlData_MINUS)
 				}
-			case msg.Buttons&computrainer.ButtonReset > 0:
-				err := dataServer.Send(&computrainer.ControllerData{
-					ControlData: &computrainer.ControlData{
-						Pressed: []computrainer.ControlData_Button{computrainer.ControlData_RESET},
-					},
-				})
-				if err != nil {
-					return fmt.Errorf("error sending button: %v", err)
+				if msg.Buttons&computrainer.ButtonReset > 0 {
+					controlData.Pressed = append(controlData.Pressed, computrainer.ControlData_RESET)
 				}
-			case msg.Buttons&computrainer.ButtonF1 > 0:
+				if msg.Buttons&computrainer.ButtonF1 > 0 {
+					controlData.Pressed = append(controlData.Pressed, computrainer.ControlData_F1)
+				}
+				if msg.Buttons&computrainer.ButtonF2 > 0 {
+					controlData.Pressed = append(controlData.Pressed, computrainer.ControlData_F2)
+				}
+				if msg.Buttons&computrainer.ButtonF3 > 0 {
+					controlData.Pressed = append(controlData.Pressed, computrainer.ControlData_F3)
+				}
+
 				err := dataServer.Send(&computrainer.ControllerData{
-					ControlData: &computrainer.ControlData{
-						Pressed: []computrainer.ControlData_Button{computrainer.ControlData_F1},
-					},
+					ControlData: &controlData,
 				})
 				if err != nil {
-					return fmt.Errorf("error sending button: %v", err)
+					return fmt.Errorf("error sending buttons: %v", err)
 				}
 			}
 		}
