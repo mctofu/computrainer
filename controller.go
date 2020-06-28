@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+// TODO: On shutdown keeps trying to reconnect to computrainer until client disconnects
+
 // Connection allows communications with the Computrainer. Read the Messages
 // channel to get metric updates and call SetLoad to adjust resistance.
 type Connection struct {
