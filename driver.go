@@ -29,12 +29,6 @@ var ergoInitCommand = []byte{
 	0x2D, 0x00, 0x00, 0x0A, 0x38, 0x10, 0xC2,
 }
 
-// Driver handles serial communications with the CompuTrainer
-type Driver struct {
-	com        io.ReadWriteCloser
-	targetLoad int32
-}
-
 // DisconnectError indicates we've lost the connection to the CompuTrainer
 // or it's no longer responding. Reconnection will be necessary to continue.
 type DisconnectError struct {
@@ -78,11 +72,38 @@ type signaler struct {
 	Errors   chan<- error
 }
 
+// Driver handles serial communications with the CompuTrainer
+type Driver struct {
+	portName   string
+	com        io.ReadWriteCloser
+	targetLoad int32
+}
+
+// NewDriver returns a Driver using the specified com port
+func NewDriver(comPort string) (*Driver, error) {
+	return &Driver{portName: comPort, targetLoad: LoadMin}, nil
+}
+
 // Connect attempts to establish communications with the CompuTrainer. If successful
 // then the returned Signals will allow interacting with the CompuTrainer.
 // Signals should be closed before closing the Driver
 func (d *Driver) Connect(ctx context.Context) (*Signals, error) {
 	log.Printf("Driver: Connect\n")
+
+	if d.com == nil {
+		port, err := serial.Open(serial.OpenOptions{
+			PortName:              d.portName,
+			BaudRate:              2400,
+			DataBits:              8,
+			StopBits:              1,
+			ParityMode:            serial.PARITY_NONE,
+			InterCharacterTimeout: 1000,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to open serial: %v", err)
+		}
+		d.com = port
+	}
 
 	// Try to clean out any stale data in the read buffers from previous
 	// connections.
@@ -235,24 +256,9 @@ func (d *Driver) setTargetLoad(load int32) {
 
 // Close releases the com port opened by the driver
 func (d *Driver) Close() error {
-	return d.com.Close()
-}
-
-// NewDriver returns a Driver using the specified com port
-func NewDriver(comPort string) (*Driver, error) {
-	port, err := serial.Open(serial.OpenOptions{
-		PortName:              comPort,
-		BaudRate:              2400,
-		DataBits:              8,
-		StopBits:              1,
-		ParityMode:            serial.PARITY_NONE,
-		InterCharacterTimeout: 1000,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to open serial: %v", err)
-	}
-
-	return &Driver{com: port, targetLoad: LoadMin}, nil
+	err := d.com.Close()
+	d.com = nil
+	return err
 }
 
 func readWithTimeout(ctx context.Context, r io.Reader, buf []byte, timeout time.Duration) error {

@@ -13,11 +13,12 @@ import (
 // Connection allows communications with the Computrainer. Read the Messages
 // channel to get metric updates and call SetLoad to adjust resistance.
 type Connection struct {
-	Messages    <-chan Message
-	loadUpdates chan int32
-	cancelChan  chan struct{}
-	runningWG   sync.WaitGroup
-	closeErr    error
+	Messages        <-chan Message
+	loadUpdates     chan int32
+	cancelChan      chan struct{}
+	recalibrateChan chan struct{}
+	runningWG       sync.WaitGroup
+	closeErr        error
 }
 
 // SetLoad sets the load in watts that the CompuTrainer should maintain in erg mode
@@ -27,6 +28,17 @@ func (c *Connection) SetLoad(targetLoad int32) {
 		// ok
 	default: // todo: timeout?
 		fmt.Println("Connection unable to set load")
+	}
+}
+
+// Recalibrate allows recalibration by temporarily disconnecting from the CompuTrainer
+// for 20 seconds.
+func (c *Connection) Recalibrate(ctx context.Context) {
+	select {
+	case c.recalibrateChan <- struct{}{}:
+		// ok
+	default:
+		log.Println("Ignoring Recalibrate: recalibration already requested")
 	}
 }
 
@@ -54,9 +66,10 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 
 	msgChan := make(chan Message)
 	conn := &Connection{
-		Messages:    msgChan,
-		loadUpdates: make(chan int32, 1),
-		cancelChan:  make(chan struct{}),
+		Messages:        msgChan,
+		loadUpdates:     make(chan int32, 1),
+		recalibrateChan: make(chan struct{}, 1),
+		cancelChan:      make(chan struct{}),
 	}
 
 	errChan := make(chan error, 1)
@@ -64,19 +77,25 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 	conn.runningWG.Add(1)
 	go func() {
 		defer conn.runningWG.Done()
+
 		sigsChan := make(chan *Signals)
 		for {
+			var loopWG sync.WaitGroup
+
 			retry := func() bool {
 				ctx := context.Background()
-				ctx, timeout := context.WithTimeout(ctx, 1*time.Second)
-				defer timeout()
-				ctx, cancel := context.WithCancel(ctx)
-				defer cancel()
+				connectCtx, connectTimeout := context.WithTimeout(ctx, 1*time.Second)
+				defer connectTimeout()
+				connectCtx, connectCancel := context.WithCancel(connectCtx)
+				defer connectCancel()
 
-				conn.runningWG.Add(1)
+				readCtx, readCancel := context.WithCancel(ctx)
+				defer readCancel()
+
+				loopWG.Add(1)
 				go func() {
-					defer conn.runningWG.Done()
-					sigs, err := c.driver.Connect(ctx)
+					defer loopWG.Done()
+					sigs, err := c.driver.Connect(connectCtx)
 					if err != nil {
 						errChan <- err
 						return
@@ -89,23 +108,34 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 					select {
 					case <-conn.cancelChan:
 						log.Printf("Cancel\n")
-						cancel()
+						connectCancel()
+						readCancel()
 						log.Printf("Close driver\n")
 						conn.closeErr = c.driver.Close()
 						// no more retries as we are stopping
 						return false
+					case <-conn.recalibrateChan:
+						log.Printf("Dropping connection for recalibration\n")
+						connectCancel()
+						readCancel()
+						conn.closeErr = c.driver.Close()
+						t := time.NewTimer(20 * time.Second)
+						select {
+						case <-t.C:
+							// reconnect
+							return true
+						case <-conn.cancelChan:
+							break
+						}
 					case sigs := <-sigsChan:
 						// connected. start copying data
-						conn.runningWG.Add(1)
-						var copyWG sync.WaitGroup
-						copyWG.Add(1)
+						loopWG.Add(1)
 						go func() {
-							defer conn.runningWG.Done()
-							defer copyWG.Done()
+							defer loopWG.Done()
 							defer sigs.Close()
 							for {
 								select {
-								case <-conn.cancelChan:
+								case <-readCtx.Done():
 									return
 								case targetLoad := <-conn.loadUpdates:
 									sigs.SetLoad(targetLoad)
@@ -127,14 +157,15 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 								}
 							}
 						}()
-						copyWG.Wait()
 					case err := <-errChan:
-						log.Printf("Closing/reconnect on err: %v", err)
+						log.Printf("Reconnecting on err: %v", err)
 						// retry
 						return true
 					}
 				}
 			}()
+			// make sure connector/reader has finished
+			loopWG.Wait()
 			if !retry {
 				return
 			}
