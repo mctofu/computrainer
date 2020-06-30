@@ -67,7 +67,7 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 	msgChan := make(chan Message)
 	conn := &Connection{
 		Messages:        msgChan,
-		loadUpdates:     make(chan int32, 1),
+		loadUpdates:     make(chan int32, 5),
 		recalibrateChan: make(chan struct{}, 1),
 		cancelChan:      make(chan struct{}),
 	}

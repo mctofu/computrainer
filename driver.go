@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jacobsa/go-serial/serial"
@@ -44,19 +45,14 @@ func (d DisconnectError) Error() string {
 type Signals struct {
 	Messages    <-chan Message
 	Errors      <-chan error
-	loadChan    chan<- int32
+	load        *int32
 	cancelChan  chan struct{}
 	connectedWG *sync.WaitGroup
 }
 
 // SetLoad sets the load in watts that the CompuTrainer should maintain in erg mode
 func (s *Signals) SetLoad(targetLoad int32) {
-	select {
-	case s.loadChan <- targetLoad:
-		// ok
-	default:
-		log.Println("Signals: unable to set load")
-	}
+	atomic.StoreInt32(s.load, targetLoad)
 }
 
 // Close disconnects from the CompuTrainer and prevents further reading/writing
@@ -151,24 +147,24 @@ func (d *Driver) Connect(ctx context.Context) (*Signals, error) {
 		return nil, fmt.Errorf("failed to write ergo init: %v", err)
 	}
 
+	var load int32
 	msgChan := make(chan Message)
 	errChan := make(chan error)
-	loadChan := make(chan int32, 1)
 	cancelChan := make(chan struct{})
 	connectedWG := &sync.WaitGroup{}
 
-	d.startConnectedLoop(&signaler{msgChan, errChan}, loadChan, cancelChan, connectedWG)
+	d.startConnectedLoop(&signaler{msgChan, errChan}, &load, cancelChan, connectedWG)
 
 	return &Signals{
 		Messages:    msgChan,
 		Errors:      errChan,
-		loadChan:    loadChan,
+		load:        &load,
 		cancelChan:  cancelChan,
 		connectedWG: connectedWG,
 	}, nil
 }
 
-func (d *Driver) startConnectedLoop(signaler *signaler, loadInput <-chan int32, cancel <-chan struct{}, connectedWG *sync.WaitGroup) {
+func (d *Driver) startConnectedLoop(signaler *signaler, targetLoad *int32, cancel <-chan struct{}, connectedWG *sync.WaitGroup) {
 	log.Printf("Driver: startConnectedLoop\n")
 	buf := make([]byte, 7)
 	loopCtx := context.Background()
@@ -180,15 +176,8 @@ func (d *Driver) startConnectedLoop(signaler *signaler, loadInput <-chan int32, 
 		defer connectedWG.Done()
 
 		for i := 0; ; i++ {
-			select {
-			case targetLoad := <-loadInput:
-				d.setTargetLoad(targetLoad)
-			default:
-				// keep going
-			}
-
 			if i%4 == 0 {
-				if err := writeControlMessage(d.com, d.targetLoad); err != nil {
+				if err := writeControlMessage(d.com, atomic.LoadInt32(targetLoad)); err != nil {
 					signaler.Errors <- DisconnectError{fmt.Errorf("failed to write load init: %v", err)}
 					return
 				}
