@@ -92,9 +92,12 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 				readCtx, readCancel := context.WithCancel(ctx)
 				defer readCancel()
 
+				var connectWG sync.WaitGroup
+				connectWG.Add(1)
 				loopWG.Add(1)
 				go func() {
 					defer loopWG.Done()
+					defer connectWG.Done()
 					sigs, err := c.driver.Connect(connectCtx)
 					if err != nil {
 						errChan <- err
@@ -103,22 +106,25 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 					sigsChan <- sigs
 				}()
 
+				closer := func() error {
+					connectCancel()
+					connectWG.Wait()
+					readCancel()
+					log.Printf("Close driver\n")
+					return c.driver.Close()
+				}
+
 				// readloop
 				for {
 					select {
 					case <-conn.cancelChan:
 						log.Printf("Cancel\n")
-						connectCancel()
-						readCancel()
-						log.Printf("Close driver\n")
-						conn.closeErr = c.driver.Close()
+						conn.closeErr = closer()
 						// no more retries as we are stopping
 						return false
 					case <-conn.recalibrateChan:
 						log.Printf("Dropping connection for recalibration\n")
-						connectCancel()
-						readCancel()
-						conn.closeErr = c.driver.Close()
+						conn.closeErr = closer()
 						t := time.NewTimer(20 * time.Second)
 						select {
 						case <-t.C:
