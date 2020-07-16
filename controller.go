@@ -83,6 +83,7 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 			var loopWG sync.WaitGroup
 
 			retry := func() bool {
+				log.Println("Connect Loop")
 				ctx := context.Background()
 				connectCtx, connectTimeout := context.WithTimeout(ctx, 1*time.Second)
 				defer connectTimeout()
@@ -99,6 +100,9 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 					defer loopWG.Done()
 					defer connectWG.Done()
 					sigs, err := c.driver.Connect(connectCtx)
+					if err == context.Canceled {
+						return
+					}
 					if err != nil {
 						errChan <- err
 						return
@@ -134,6 +138,7 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 							break
 						}
 					case sigs := <-sigsChan:
+						log.Println("Got signals")
 						// connected. start copying data
 						loopWG.Add(1)
 						go func() {
@@ -164,7 +169,7 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 							}
 						}()
 					case err := <-errChan:
-						log.Printf("Reconnecting on err: %v", err)
+						log.Printf("Reconnecting on err: %v\n", err)
 						// retry
 						return true
 					}
@@ -172,6 +177,12 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 			}()
 			// make sure connector/reader has finished
 			loopWG.Wait()
+			select {
+			case err := <-errChan:
+				log.Printf("warning: drained err: %v\n", err)
+			default:
+				break
+			}
 			if !retry {
 				return
 			}
