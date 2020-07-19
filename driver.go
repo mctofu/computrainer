@@ -124,7 +124,7 @@ func (d *Driver) Connect(ctx context.Context) (*Signals, error) {
 	go func() {
 		buf := make([]byte, 6)
 		if err := read(ctx, d.com, buf); err != nil {
-			result <- fmt.Errorf("failed to read hello response: %v", err)
+			result <- fmt.Errorf("failed to read hello response: %w", err)
 		}
 		bufMsg := string(buf)
 		if bufMsg != "LinkUp" {
@@ -136,7 +136,8 @@ func (d *Driver) Connect(ctx context.Context) (*Signals, error) {
 
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("failed to connect before timeout: %v", ctx.Err())
+		// TODO: wait for read goroutine to end or close port?
+		return nil, fmt.Errorf("failed to connect before timeout: %w", ctx.Err())
 	case err := <-result:
 		if err != nil {
 			return nil, err

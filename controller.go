@@ -2,6 +2,7 @@ package computrainer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -100,7 +101,7 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 					defer loopWG.Done()
 					defer connectWG.Done()
 					sigs, err := c.driver.Connect(connectCtx)
-					if err == context.Canceled {
+					if errors.Is(err, context.Canceled) {
 						return
 					}
 					if err != nil {
@@ -130,12 +131,21 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 						log.Printf("Dropping connection for recalibration\n")
 						conn.closeErr = closer()
 						t := time.NewTimer(20 * time.Second)
-						select {
-						case <-t.C:
-							// reconnect
+						reconnect := func() bool {
+							for {
+								select {
+								case <-t.C:
+									// reconnect
+									return true
+								case <-conn.cancelChan:
+									return false
+								case <-conn.recalibrateChan:
+									// ignore, already recalibrating
+								}
+							}
+						}()
+						if reconnect {
 							return true
-						case <-conn.cancelChan:
-							break
 						}
 					case sigs := <-sigsChan:
 						log.Println("Got signals")
