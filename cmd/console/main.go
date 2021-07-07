@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/mctofu/computrainer"
-	serial "go.bug.st/serial.v1"
+	"go.bug.st/serial"
 )
 
 func main() {
