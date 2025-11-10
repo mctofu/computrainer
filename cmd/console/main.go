@@ -12,6 +12,7 @@ import (
 	"go.bug.st/serial"
 )
 
+//gocyclo:ignore
 func main() {
 	ports, err := serial.GetPortsList()
 	if err != nil {

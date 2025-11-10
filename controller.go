@@ -58,6 +58,8 @@ type Controller struct {
 
 // Start opens the specified comPort and connects to the
 // CompuTrainer.
+//
+//gocyclo:ignore
 func (c *Controller) Start(comPort string) (*Connection, error) {
 	driver, err := NewDriver(comPort)
 	if err != nil {
