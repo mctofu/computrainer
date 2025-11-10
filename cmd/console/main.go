@@ -12,6 +12,7 @@ import (
 	"go.bug.st/serial"
 )
 
+//gocyclo:ignore
 func main() {
 	ports, err := serial.GetPortsList()
 	if err != nil {
@@ -44,7 +45,7 @@ func main() {
 
 	log.Printf("Started!\n")
 
-	exitSignal := make(chan os.Signal)
+	exitSignal := make(chan os.Signal, 1)
 	signal.Notify(exitSignal, syscall.SIGTERM, syscall.SIGINT)
 
 	var targetLoad int32

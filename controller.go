@@ -34,7 +34,7 @@ func (c *Connection) SetLoad(targetLoad int32) {
 
 // Recalibrate allows recalibration by temporarily disconnecting from the CompuTrainer
 // for 20 seconds.
-func (c *Connection) Recalibrate(ctx context.Context) {
+func (c *Connection) Recalibrate(_ context.Context) {
 	select {
 	case c.recalibrateChan <- struct{}{}:
 		// ok
@@ -58,6 +58,8 @@ type Controller struct {
 
 // Start opens the specified comPort and connects to the
 // CompuTrainer.
+//
+//gocyclo:ignore
 func (c *Controller) Start(comPort string) (*Connection, error) {
 	driver, err := NewDriver(comPort)
 	if err != nil {
@@ -191,7 +193,7 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 			case err := <-errChan:
 				log.Printf("warning: drained err: %v\n", err)
 			default:
-				break
+				// continue
 			}
 			if !retry {
 				return

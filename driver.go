@@ -52,7 +52,17 @@ type Signals struct {
 
 // SetLoad sets the load in watts that the CompuTrainer should maintain in erg mode
 func (s *Signals) SetLoad(targetLoad int32) {
-	atomic.StoreInt32(s.load, targetLoad)
+	var load int32
+	switch {
+	case targetLoad > LoadMax:
+		load = LoadMax
+	case targetLoad < LoadMin:
+		load = LoadMin
+	default:
+		load = targetLoad
+	}
+
+	atomic.StoreInt32(s.load, load)
 }
 
 // Close disconnects from the CompuTrainer and prevents further reading/writing
@@ -70,14 +80,13 @@ type signaler struct {
 
 // Driver handles serial communications with the CompuTrainer
 type Driver struct {
-	portName   string
-	com        io.ReadWriteCloser
-	targetLoad int32
+	portName string
+	com      io.ReadWriteCloser
 }
 
 // NewDriver returns a Driver using the specified com port
 func NewDriver(comPort string) (*Driver, error) {
-	return &Driver{portName: comPort, targetLoad: LoadMin}, nil
+	return &Driver{portName: comPort}, nil
 }
 
 // Connect attempts to establish communications with the CompuTrainer. If successful
@@ -230,17 +239,6 @@ func (d *Driver) readTo(ctx context.Context, buf []byte, msgChan chan<- Message,
 		return
 	case msgChan <- msg:
 		return
-	}
-}
-
-func (d *Driver) setTargetLoad(load int32) {
-	switch {
-	case load > LoadMax:
-		d.targetLoad = LoadMax
-	case load < LoadMin:
-		d.targetLoad = LoadMin
-	default:
-		d.targetLoad = load
 	}
 }
 
