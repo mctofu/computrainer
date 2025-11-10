@@ -191,7 +191,7 @@ func (c *Controller) Start(comPort string) (*Connection, error) {
 			case err := <-errChan:
 				log.Printf("warning: drained err: %v\n", err)
 			default:
-				break
+				// continue
 			}
 			if !retry {
 				return

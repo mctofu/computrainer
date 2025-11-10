@@ -44,7 +44,7 @@ func main() {
 
 	log.Printf("Started!\n")
 
-	exitSignal := make(chan os.Signal)
+	exitSignal := make(chan os.Signal, 1)
 	signal.Notify(exitSignal, syscall.SIGTERM, syscall.SIGINT)
 
 	var targetLoad int32

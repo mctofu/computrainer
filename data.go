@@ -6,12 +6,12 @@ type DataType uint8
 // DataType values
 const (
 	DataNone      DataType = 0x00
-	DataSpeed              = 0x01
-	DataPower              = 0x02
-	DataHeartRate          = 0x03
-	DataCadence            = 0x06
-	DataRRC                = 0x09
-	DataSensor             = 0x0b
+	DataSpeed     DataType = 0x01
+	DataPower     DataType = 0x02
+	DataHeartRate DataType = 0x03
+	DataCadence   DataType = 0x06
+	DataRRC       DataType = 0x09
+	DataSensor    DataType = 0x0b
 )
 
 // Button bit mappings
