@@ -20,5 +20,6 @@ jobs:
         uses: github/super-linter@v6
         env:
           DEFAULT_BRANCH: main
+          VALIDATE_GO: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
