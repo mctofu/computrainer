@@ -34,7 +34,7 @@ func (c *Connection) SetLoad(targetLoad int32) {
 
 // Recalibrate allows recalibration by temporarily disconnecting from the CompuTrainer
 // for 20 seconds.
-func (c *Connection) Recalibrate(ctx context.Context) {
+func (c *Connection) Recalibrate(_ context.Context) {
 	select {
 	case c.recalibrateChan <- struct{}{}:
 		// ok
