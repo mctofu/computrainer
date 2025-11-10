@@ -1,3 +1,4 @@
+---
 name: Lint Code Base
 
 on:
@@ -25,4 +26,3 @@ jobs:
           DEFAULT_BRANCH: main
           VALIDATE_GO: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
