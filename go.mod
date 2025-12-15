@@ -1,6 +1,6 @@
 module github.com/mctofu/computrainer
 
-go 1.20
+go 1.25
 
 require (
 	github.com/jacobsa/go-serial v0.0.0-20180131005756-15cf729a72d4
