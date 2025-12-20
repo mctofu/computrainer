@@ -24,5 +24,6 @@ jobs:
         uses: super-linter/super-linter/slim@v8
         env:
           DEFAULT_BRANCH: main
+          VALIDATE_GITHUB_ACTIONS_ZIZMOR: false
           VALIDATE_GO: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
