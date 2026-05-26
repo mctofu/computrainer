@@ -1,13 +1,10 @@
 module github.com/mctofu/computrainer
 
-go 1.25
+go 1.26.0
 
 require (
 	github.com/jacobsa/go-serial v0.0.0-20180131005756-15cf729a72d4
-	go.bug.st/serial v1.6.4
+	go.bug.st/serial v1.7.0
 )
 
-require (
-	github.com/creack/goselect v0.1.2 // indirect
-	golang.org/x/sys v0.19.0 // indirect
-)
+require golang.org/x/sys v0.43.0 // indirect
